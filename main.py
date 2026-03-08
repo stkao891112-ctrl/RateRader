@@ -1,11 +1,11 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS  # 記得加這一行
-from Binance_funding import get_binance_funding_rates
-from OKX_funding import get_okx_funding_rates
-from Bybit_funding import get_bybit_funding_rates
-from Bitget_funding import get_bitget_funding_rates
-from Backpack_funding import get_backpack_funding_rates
-from Hyperliquid_funding import get_hyperliquid_funding_rates
+from funding.Binance_funding import get_binance_funding_rates
+from funding.OKX_funding import get_okx_funding_rates
+from funding.Bybit_funding import get_bybit_funding_rates
+from funding.Bitget_funding import get_bitget_funding_rates
+from funding.Backpack_funding import get_backpack_funding_rates
+from funding.Hyperliquid_funding import get_hyperliquid_funding_rates
 
 app = Flask(__name__)
 # 加入下面這行，禁止 Flask 自動對 JSON 的 Key 進行字母排序
