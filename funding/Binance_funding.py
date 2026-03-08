@@ -3,9 +3,9 @@ import json
 
 def get_binance_funding_rates(assets):
     # 1. 抓取費率 (原本的 API，更新最快)
-    premium_url = 'https://fapi.binance.com/fapi/v1/premiumIndex'
+    premium_url = 'https://rate-rader.stkao891112.workers.dev/fapi/v1/premiumIndex'
     # 2. 抓取週期資訊 (新的 API)
-    info_url = 'https://fapi.binance.com/fapi/v1/fundingInfo'
+    info_url = 'https://rate-rader.stkao891112.workers.dev/fapi/v1/fundingInfo'
     
     if isinstance(assets, str):
         assets = [assets.upper()]
