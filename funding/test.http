@@ -1,0 +1,6 @@
+POST https://api.hyperliquid.xyz/info
+Content-Type: application/json
+
+{
+    "type": "predictedFundings"
+}
