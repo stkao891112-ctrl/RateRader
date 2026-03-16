@@ -179,6 +179,34 @@ tbody tr:hover td:first-child { background: #232328; }
   animation: pulse 1.2s ease-in-out infinite; width: 56px; height: 14px; vertical-align: middle;
 }
 @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:0.8} }
+
+/* ── 手機版緊湊排版 ── */
+@media (max-width: 600px) {
+  #app { padding: 10px 8px; }
+  .logo { font-size: 9px; }
+  .last-update { font-size: 8px; }
+  #coin-input { font-size: 9px; padding: 7px 8px; }
+  .btn { font-size: 8px; padding: 7px 10px; }
+  .filter-label { font-size: 7px; }
+  .chip { font-size: 8px; padding: 4px 7px 4px 5px; gap: 5px; }
+  .chip img, .chip .chip-icon-placeholder { width: 16px; height: 16px; }
+  .chip-all { font-size: 8px; padding: 4px 8px; }
+  .period-btn { font-size: 8px; padding: 5px 10px; }
+  .section-label { font-size: 7px; }
+  .countdown { font-size: 7px; }
+  .scroll-hint { font-size: 8px; }
+
+  th { font-size: 8px; padding: 8px 6px; }
+  th:first-child, td:first-child { width: 90px; min-width: 90px; max-width: 90px; }
+  th:not(:first-child), td:not(:first-child) { width: 80px; min-width: 80px; max-width: 80px; }
+  td:not(:first-child) { padding: 8px 6px; }
+  .coin-cell { padding: 8px 6px 8px 8px; gap: 6px; }
+  .coin-icon, [style*="width:32px"] { width: 24px !important; height: 24px !important; }
+  .coin-name { font-size: 9px; }
+  .rate-pos, .rate-neg, .rate-zero { font-size: 9px; }
+  .rate-na { font-size: 8px; }
+  .best-badge { font-size: 7px; padding: 1px 3px; }
+}
 </style>
 </head>
 <body>
