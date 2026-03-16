@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Funding">
+<meta name="theme-color" content="#161618">
+<title>Funding Rates</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #161618;
+  --bg2:    #1e1e21;
+  --bg3:    #26262c;
+  --border: #2e2e36;
+  --accent: #00e5a0;
+  --text:   #f0f0f5;
+  --sub:    #a0a0b0;
+  --muted:  #606070;
+  --pos:    #00c97a;
+  --neg:    #ff4455;
+  --mono:   'Press Start 2P', 'Courier New', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { background: var(--bg); color: var(--text); font-family: var(--mono); min-height: 100vh; }
+#app { padding: 16px 12px; }
+
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+}
+.logo { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--accent); }
+.status-row { display: flex; align-items: center; gap: 8px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.dot.loading { background: #ffaa00; }
+.dot.error   { background: var(--neg); }
+.last-update { font-size: 9px; color: var(--sub); }
+
+.controls { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.tag-input-wrap { display: flex; gap: 6px; flex: 1; min-width: 180px; }
+#coin-input {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--mono); font-size: 10px;
+  padding: 9px 12px; border-radius: 4px; flex: 1; outline: none;
+  text-transform: uppercase; -webkit-appearance: none;
+}
+#coin-input:focus { border-color: var(--accent); }
+#coin-input::placeholder { color: var(--muted); text-transform: none; }
+.btn {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--mono); font-size: 9px;
+  letter-spacing: 1px; padding: 9px 14px; border-radius: 4px;
+  cursor: pointer; white-space: nowrap;
+}
+.btn:active { opacity: 0.6; }
+.btn.primary { border-color: var(--accent); color: var(--accent); }
+.btn.primary:active { background: var(--accent); color: #000; }
+.btn.dim { border-color: var(--muted); color: var(--muted); font-size: 11px; padding: 9px 11px; }
+
+/* ── Filter chips ── */
+.filter-label { font-size: 8px; letter-spacing: 2px; color: var(--muted); margin-bottom: 8px; }
+.chips-wrap {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;
+  padding-bottom: 14px; border-bottom: 1px solid var(--border);
+}
+.chip {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 4px; padding: 6px 10px 6px 7px;
+  cursor: pointer; font-size: 9px; color: var(--sub);
+  transition: border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+.chip img, .chip .chip-icon-placeholder {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+}
+.chip .chip-icon-placeholder {
+  background: var(--border); display: flex; align-items: center;
+  justify-content: center; font-size: 8px; font-weight: 700; color: var(--sub);
+}
+.chip.active {
+  border-color: var(--accent); color: var(--text);
+  background: rgba(0,229,160,0.07);
+}
+.chip:active { opacity: 0.7; }
+.chip-all {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 4px; padding: 6px 12px;
+  cursor: pointer; font-size: 9px; letter-spacing: 1px;
+  color: var(--sub); user-select: none;
+}
+.chip-all.active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,160,0.07); }
+
+/* ── Period switcher ── */
+.period-wrap {
+  display: flex; gap: 2px; margin-bottom: 14px;
+  background: var(--bg2); border-radius: 8px;
+  padding: 4px; width: fit-content;
+}
+.period-btn {
+  background: transparent; border: none;
+  color: var(--muted); font-family: var(--mono); font-size: 9px;
+  padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  letter-spacing: 1px;
+}
+.period-btn:active { opacity: 0.7; }
+.period-btn.active { background: var(--bg3); color: var(--text); }
+
+.timer-bar { height: 2px; background: var(--border); border-radius: 1px; margin-bottom: 14px; overflow: hidden; }
+.timer-fill { height: 100%; background: var(--accent); transition: width 1s linear; }
+.meta-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.section-label { font-size: 8px; letter-spacing: 2px; color: var(--sub); }
+.countdown { font-size: 8px; color: var(--muted); }
+
+.scroll-hint {
+  font-size: 8px; color: var(--muted); letter-spacing: 1px;
+  margin-bottom: 6px; display: none; align-items: center; gap: 4px;
+}
+
+.table-outer { border: 1px solid var(--border); border-radius: 4px; overflow: hidden; position: relative; }
+.table-outer.has-scroll::after {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 28px;
+  background: linear-gradient(to right, transparent, rgba(22,22,24,0.9));
+  pointer-events: none; border-radius: 0 10px 10px 0;
+}
+.table-scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+
+table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; table-layout: fixed; }
+th, td { padding: 0; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+thead tr { background: var(--bg3); }
+th { font-size: 9px; color: var(--text); font-weight: 500; text-align: center; padding: 13px 14px; white-space: nowrap; }
+
+th:first-child, td:first-child {
+  width: 160px; min-width: 160px; max-width: 160px;
+  position: sticky; left: 0; z-index: 2;
+  background: var(--bg3); border-right: 1px solid var(--border); text-align: left;
+}
+td:first-child { background: var(--bg2); z-index: 1; }
+th:first-child { z-index: 3; padding-left: 14px; }
+
+th:not(:first-child) { width: 120px; min-width: 120px; max-width: 120px; }
+td:not(:first-child) { width: 120px; min-width: 120px; max-width: 120px; text-align: center; padding: 14px 10px; }
+
+.coin-cell { display: flex; align-items: center; gap: 10px; padding: 12px 10px 12px 14px; }
+.coin-icon { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--bg3); }
+.coin-icon-placeholder {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--bg3); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: var(--sub); flex-shrink: 0;
+}
+.coin-name { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--text); }
+
+tbody tr:hover td { background: var(--bg3); }
+tbody tr:hover td:first-child { background: #232328; }
+
+.rate-pos  { color: var(--pos); font-size: 11px; font-weight: 500; }
+.rate-neg  { color: var(--neg); font-size: 11px; font-weight: 500; }
+.rate-na   { color: var(--muted); font-size: 10px; }
+.rate-zero { color: var(--sub); font-size: 11px; }
+.best-badge {
+  display: block; font-size: 7px; padding: 1px 5px;
+  border-radius: 3px; background: #0a2a1a; color: var(--pos);
+  border: 1px solid #0f4a2a; margin: 3px auto 0; width: fit-content;
+}
+.cache-badge {
+  display: inline-block; font-size: 7px; padding: 1px 5px;
+  border-radius: 3px; background: #1a1a2e; color: #7777cc;
+  border: 1px solid #333366; margin-left: 4px; vertical-align: middle;
+}
+.skeleton {
+  display: inline-block; background: var(--bg3); border-radius: 3px;
+  animation: pulse 1.2s ease-in-out infinite; width: 56px; height: 14px; vertical-align: middle;
+}
+@keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:0.8} }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="header">
+    <div class="logo">&#9670; Funding Rates</div>
+    <div class="status-row">
+      <div class="dot" id="status-dot"></div>
+      <span class="last-update" id="last-update">--</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="tag-input-wrap">
+      <input id="coin-input" placeholder="Add coin (e.g. PEPE)" maxlength="12" />
+      <button class="btn" onclick="addCoinFromInput()">+ Add</button>
+    </div>
+  </div>
+
+  <div class="filter-label">Filter coins</div>
+  <div class="chips-wrap" id="chips-wrap"></div>
+
+  <div class="period-wrap">
+    <button class="period-btn active" onclick="setPeriod('8H', this)">8H</button>
+    <button class="period-btn" onclick="setPeriod('1D', this)">1D</button>
+    <button class="period-btn" onclick="setPeriod('1M', this)">1M</button>
+    <button class="period-btn" onclick="setPeriod('1Y', this)">1Y</button>
+  </div>
+
+  <div class="timer-bar"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
+  <div class="meta-row">
+    <div class="section-label" id="period-label">Live rates &mdash; 8H</div>
+    <span class="countdown" id="countdown"></span>
+  </div>
+  <div class="scroll-hint" id="scroll-hint">&#8594; slide to see all exchanges</div>
+
+  <div class="table-outer" id="table-outer">
+    <div class="table-scroll-wrap" id="scroll-wrap">
+      <table>
+        <thead><tr id="thead-row"></tr></thead>
+        <tbody id="rate-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+<script>
+const API_BASE    = '';
+const PERIOD_MULT = { '8H': 1, '1D': 3, '1M': 90, '1Y': 1095 };
+let currentPeriod = '8H';
+
+function setPeriod(p, el) {
+  currentPeriod = p;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderTable(rateData);
+}
+
+const REFRESH_SEC = 30;
+let   EXCHANGES   = ['Binance','OKX','Bybit','Bitget','Backpack','Hyperliquid'];
+
+const ALL_COINS = ['BTC','ETH','SOL','HYPE','PAXG','XAUT','BNB','XRP','AAVE','DOGE','ADA','SUI','TAO','UNI','DOT','LIT'];
+
+const ICON_MAP = {
+  BTC:  'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
+  ETH:  'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+  SOL:  'https://assets.coingecko.com/coins/images/4128/small/solana.png',
+  HYPE: 'https://assets.coingecko.com/coins/images/50882/standard/hyperliquid.jpg?1729431300',
+  PAXG: 'https://assets.coingecko.com/coins/images/9519/small/paxg.PNG',
+  XAUT: 'https://assets.coingecko.com/coins/images/10481/small/Tether_Gold.png',
+  BNB:  'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png',
+  XRP:  'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png',
+  AAVE: 'https://assets.coingecko.com/coins/images/12645/small/AAVE.png',
+  DOGE: 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png',
+  ADA:  'https://assets.coingecko.com/coins/images/975/small/cardano.png',
+  SUI:  'https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg',
+  TAO:  'https://assets.coingecko.com/coins/images/28452/small/ARUsPeNQ_400x400.jpeg',
+  UNI:  'https://assets.coingecko.com/coins/images/12504/small/uniswap-uni.png',
+  DOT:  'https://assets.coingecko.com/coins/images/12171/small/polkadot.png',
+  LIT:  'https://assets.coingecko.com/coins/images/71121/standard/lighter.png?1765888098',
+  LINK: 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
+  AVAX: 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png',
+  NEAR: 'https://assets.coingecko.com/coins/images/10365/small/near.jpg',
+  APT:  'https://assets.coingecko.com/coins/images/26455/small/aptos_round.png',
+  ARB:  'https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg',
+  OP:   'https://assets.coingecko.com/coins/images/25244/small/Optimism.png',
+  PEPE: 'https://assets.coingecko.com/coins/images/29850/small/pepe-token.jpeg',
+  LTC:  'https://assets.coingecko.com/coins/images/2/small/litecoin.png',
+  ATOM: 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png',
+  TRX:  'https://assets.coingecko.com/coins/images/1094/small/tron-logo.png',
+};
+
+// 所有已知幣種（包含動態新增的）
+let allCoins   = [...ALL_COINS];
+// 目前篩選顯示的幣種（null = 全部）
+let activeSet  = new Set(ALL_COINS);
+let allActive  = true;
+
+let rateData   = {};
+let timer      = REFRESH_SEC;
+let countdownId = null;
+
+// ── Icon helpers ──────────────────────────────────────────────
+function iconUrl(sym) { return ICON_MAP[sym.toUpperCase()] || null; }
+
+function iconImg(sym, size) {
+  const s = size || 32;
+  const url = iconUrl(sym);
+  if (url) return `<img src="${url}" width="${s}" height="${s}"
+    style="border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg3)"
+    alt="${sym}"
+    onerror="this.outerHTML='<div style=\\'width:${s}px;height:${s}px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:${Math.floor(s*0.3)}px;font-weight:700;color:var(--sub);flex-shrink:0\\'>${sym.slice(0,3)}</div>'">`; 
+  return `<div style="width:${s}px;height:${s}px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:${Math.floor(s*0.3)}px;font-weight:700;color:var(--sub);flex-shrink:0">${sym.slice(0,3)}</div>`;
+}
+
+// ── Header ────────────────────────────────────────────────────
+function buildHeader() {
+  document.getElementById('thead-row').innerHTML =
+    '<th>Coin</th>' + EXCHANGES.map(e => `<th>${e}</th>`).join('');
+}
+
+// ── Chips ─────────────────────────────────────────────────────
+function renderChips() {
+  const wrap = document.getElementById('chips-wrap');
+  const allCls = allActive ? 'chip-all active' : 'chip-all';
+  let html = `<div class="${allCls}" onclick="toggleAll()">All</div>`;
+  html += allCoins.map(c => {
+    const cls = activeSet.has(c) ? 'chip active' : 'chip';
+    return `<div class="${cls}" onclick="toggleChip('${c}')" id="chip-${c}">
+      ${iconImg(c, 20)}
+      <span>${c}</span>
+    </div>`;
+  }).join('');
+  wrap.innerHTML = html;
+}
+
+function toggleAll() {
+  allActive = true;
+  activeSet = new Set(allCoins);
+  renderChips();
+  renderTable(rateData);
+}
+
+function toggleChip(c) {
+  if (allActive) {
+    // 第一次點單一幣：取消全選，只顯示這一個
+    allActive = false;
+    activeSet = new Set([c]);
+  } else {
+    if (activeSet.has(c)) {
+      activeSet.delete(c);
+      if (activeSet.size === 0) { toggleAll(); return; }
+    } else {
+      activeSet.add(c);
+      if (activeSet.size === allCoins.length) { allActive = true; }
+    }
+  }
+  renderChips();
+  renderTable(rateData);
+}
+
+// ── Add coin ──────────────────────────────────────────────────
+function addCoinFromInput() {
+  const inp = document.getElementById('coin-input');
+  const val = inp.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (val && !allCoins.includes(val)) {
+    allCoins.push(val);
+    activeSet.add(val);
+    allActive = (activeSet.size === allCoins.length);
+    renderChips();
+    fetchRates();
+  } else if (val && allCoins.includes(val)) {
+    activeSet.add(val);
+    allActive = (activeSet.size === allCoins.length);
+    renderChips();
+    renderTable(rateData);
+  }
+  inp.value = '';
+}
+document.getElementById('coin-input').addEventListener('keydown', e => { if(e.key==='Enter') addCoinFromInput(); });
+
+// ── Rate helpers ──────────────────────────────────────────────
+function parseRate(raw) {
+  if (!raw || raw === 'N/A') return null;
+  const n = parseFloat(String(raw).replace('%',''));
+  return isNaN(n) ? null : n;
+}
+function formatRate(raw) {
+  const n = parseRate(raw);
+  if (n === null) return '<span class="rate-na">—</span>';
+  const v    = n * PERIOD_MULT[currentPeriod];
+  const sign = v > 0 ? '+' : '';
+  const cls  = v >  0.000001 ? 'rate-pos' : v < -0.000001 ? 'rate-neg' : 'rate-zero';
+  const decimals = currentPeriod === '8H' ? 4 : currentPeriod === '1D' ? 4 : 2;
+  return `<span class="${cls}">${sign}${v.toFixed(decimals)}%</span>`;
+}
+function findBest(coinObj) {
+  let best = null, bestVal = -Infinity;
+  EXCHANGES.forEach(ex => { const n = parseRate(coinObj[ex]); if(n!==null && n>bestVal){bestVal=n;best=ex;} });
+  return bestVal > 0 ? best : null;
+}
+
+// ── Render table ──────────────────────────────────────────────
+function renderTable(data) {
+  const lbl = document.getElementById('period-label');
+  if (lbl) lbl.textContent = 'Live rates — ' + currentPeriod;
+  const tbody  = document.getElementById('rate-tbody');
+  const visible = allCoins.filter(c => activeSet.has(c));
+  if (!visible.length) {
+    tbody.innerHTML = `<tr><td colspan="${EXCHANGES.length+1}"
+      style="text-align:center;color:var(--muted);padding:28px">No coins selected</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = visible.map(coin => {
+    const row      = data[coin];
+    const coinCell = `<td><div style="display:flex;align-items:center;gap:10px;padding:12px 10px 12px 14px">
+      ${iconImg(coin,32)}<span class="coin-name">${coin}</span></div></td>`;
+    if (!row) return `<tr>${coinCell}${EXCHANGES.map(()=>'<td><span class="skeleton"></span></td>').join('')}</tr>`;
+    const best  = findBest(row);
+    const cells = EXCHANGES.map(ex =>
+      `<td>${formatRate(row[ex])}${ex===best?'<span class="best-badge">best</span>':''}</td>`
+    ).join('');
+    return `<tr>${coinCell}${cells}</tr>`;
+  }).join('');
+  checkScrollable();
+}
+
+// ── Scroll detection ──────────────────────────────────────────
+function checkScrollable() {
+  const wrap = document.getElementById('scroll-wrap');
+  const ok   = wrap.scrollWidth > wrap.clientWidth + 4;
+  document.getElementById('scroll-hint').style.display = ok ? 'flex' : 'none';
+  document.getElementById('table-outer').classList.toggle('has-scroll', ok);
+}
+window.addEventListener('resize', checkScrollable);
+
+// ── Status ────────────────────────────────────────────────────
+function setStatus(s) {
+  document.getElementById('status-dot').className =
+    'dot'+(s==='loading'?' loading':s==='error'?' error':'');
+}
+
+// ── Fetch ─────────────────────────────────────────────────────
+async function fetchRates() {
+  if (!allCoins.length) return;
+  setStatus('loading');
+  document.getElementById('last-update').textContent = 'fetching...';
+  const isFirstLoad = Object.keys(rateData).length === 0;
+  if (isFirstLoad) renderTable({});
+  try {
+    const url = `${API_BASE}/api/funding?assets=${allCoins.join(',')}`;
+    const res  = await fetch(url);
+    const json = await res.json();
+    if (json.status === 'success') {
+      rateData = json.data;
+      renderTable(rateData);
+      setStatus('ok');
+      const t = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const c = json.cached ? `<span class="cache-badge">cached ${json.age}s ago</span>` : '';
+      document.getElementById('last-update').innerHTML = t + c;
+    } else throw new Error();
+  } catch(e) {
+    setStatus('error');
+    document.getElementById('last-update').textContent = 'connection error';
+    renderTable(rateData);
+  }
+  resetTimer();
+}
+
+
+// ── Countdown ─────────────────────────────────────────────────
+function resetTimer() { timer = REFRESH_SEC; updateTimerUI(); }
+function updateTimerUI() {
+  document.getElementById('timer-fill').style.width = (timer/REFRESH_SEC*100)+'%';
+  document.getElementById('countdown').textContent  = `auto-refresh in ${timer}s`;
+}
+function startCountdown() {
+  clearInterval(countdownId);
+  countdownId = setInterval(() => {
+    timer--;
+    if (timer <= 0) { fetchRates(); return; }
+    updateTimerUI();
+  }, 1000);
+}
+
+// ── Init ──────────────────────────────────────────────────────
+buildHeader();
+renderChips();
+renderTable({});
+fetchRates();
+startCountdown();
+</script>
+</body>
+</html>

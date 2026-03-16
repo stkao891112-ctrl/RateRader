@@ -1,5 +1,8 @@
-from flask import Flask, jsonify, request
-from flask_cors import CORS  # 記得加這一行
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+
 from funding.Binance_funding import get_binance_funding_rates
 from funding.OKX_funding import get_okx_funding_rates
 from funding.Bybit_funding import get_bybit_funding_rates
@@ -7,43 +10,95 @@ from funding.Bitget_funding import get_bitget_funding_rates
 from funding.Backpack_funding import get_backpack_funding_rates
 from funding.Hyperliquid_funding import get_hyperliquid_funding_rates
 
-app = Flask(__name__)
-# 加入下面這行，禁止 Flask 自動對 JSON 的 Key 進行字母排序
+app = Flask(__name__, static_folder='static')
 app.json.sort_keys = False
-CORS(app)  # 允許所有來源連線，開發最方便
+CORS(app)
 
+# ─── Cache 設定 ────────────────────────────────────────────────
+_cache = {}
+CACHE_TTL = 30  # 秒
+
+# ─── 各交易所抓取函數對應表 ────────────────────────────────────
+EXCHANGE_FETCHERS = {
+    'Binance':     get_binance_funding_rates,
+    'OKX':         get_okx_funding_rates,
+    'Bybit':       get_bybit_funding_rates,
+    'Bitget':      get_bitget_funding_rates,
+    'Backpack':    get_backpack_funding_rates,
+    'Hyperliquid': get_hyperliquid_funding_rates,
+}
+
+def fetch_one(name, func, assets):
+    """單一交易所抓取，出錯回傳全 N/A 不影響其他交易所"""
+    try:
+        data = func(assets)
+        return name, data
+    except Exception as e:
+        print(f'[{name}] error: {e}')
+        # 出錯時回傳每個幣都是 N/A
+        return name, [{'rate': 'N/A'} for _ in assets]
+
+# ─── 首頁 ──────────────────────────────────────────────────────
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
+
+# ─── 主要 API ──────────────────────────────────────────────────
 @app.route('/api/funding')
 def funding():
-    # 1. 取得參數並清理
-    assets_raw = request.args.get('assets', 'BTC,ETH')
-    assets = [a.strip().upper() for a in assets_raw.split(',')]
-    
-    # 2. 向所有交易所抓取數據
-    binance_data = get_binance_funding_rates(assets)
-    okx_data = get_okx_funding_rates(assets)
-    bybit_data = get_bybit_funding_rates(assets)
-    bitget_data = get_bitget_funding_rates(assets)
-    backpack_data = get_backpack_funding_rates(assets)
-    hyperliquid_data = get_hyperliquid_funding_rates(assets)
+    # 1. 取得並清理幣種參數
+    assets_raw = request.args.get('assets', 'BTC,ETH,SOL,HYPE')
+    assets = [a.strip().upper() for a in assets_raw.split(',') if a.strip()]
 
-    # 3. 合併數據
-    combined_results = {}
+    if not assets:
+        return jsonify({'status': 'error', 'message': 'No assets provided'}), 400
 
-    for i, coin in enumerate(assets):
-        combined_results[coin] = {
-            "Binance":     binance_data[i]['rate']     if i < len(binance_data)     else "N/A",
-            "OKX":         okx_data[i]['rate']         if i < len(okx_data)         else "N/A",
-            "Bybit":       bybit_data[i]['rate']       if i < len(bybit_data)       else "N/A",
-            "Bitget":      bitget_data[i]['rate']      if i < len(bitget_data)      else "N/A",
-            "Backpack":    backpack_data[i]['rate']    if i < len(backpack_data)    else "N/A",
-            "Hyperliquid": hyperliquid_data[i]['rate'] if i < len(hyperliquid_data) else "N/A",
-            "Interval": "8H"
+    # 2. Cache key
+    cache_key = ','.join(sorted(assets))
+    now = time.time()
+
+    # 3. 檢查快取
+    if cache_key in _cache and (now - _cache[cache_key]['ts']) < CACHE_TTL:
+        return jsonify({
+            'status': 'success',
+            'cached': True,
+            'age': int(now - _cache[cache_key]['ts']),
+            'data': _cache[cache_key]['data']
+        })
+
+    # 4. 平行抓取所有交易所（同時發出，誰先好先收）
+    results = {}
+    with ThreadPoolExecutor(max_workers=len(EXCHANGE_FETCHERS)) as executor:
+        futures = {
+            executor.submit(fetch_one, name, func, assets): name
+            for name, func in EXCHANGE_FETCHERS.items()
         }
+        for future in as_completed(futures):
+            name, data = future.result()
+            results[name] = data
+
+    # 5. 合併資料
+    combined = {}
+    for i, coin in enumerate(assets):
+        combined[coin] = {'Interval': '8H'}
+        for ex_name in EXCHANGE_FETCHERS.keys():
+            data = results.get(ex_name, [])
+            combined[coin][ex_name] = data[i]['rate'] if i < len(data) else 'N/A'
+
+    # 6. 存進快取
+    _cache[cache_key] = {'ts': now, 'data': combined}
 
     return jsonify({
-        "status": "success",
-        "data": combined_results
+        'status': 'success',
+        'cached': False,
+        'age': 0,
+        'data': combined
     })
+
+# ─── 健康檢查（GCP 負載均衡用）─────────────────────────────────
+@app.route('/health')
+def health():
+    return jsonify({'status': 'ok', 'cache_keys': len(_cache)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=False)
