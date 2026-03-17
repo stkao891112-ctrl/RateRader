@@ -1,69 +1,70 @@
 import requests
 import json
+import time
 
-def get_binance_funding_rates(assets):
-    # 1. 抓取費率 (原本的 API，更新最快)
-    premium_url = 'https://rate-rader.stkao891112.workers.dev/fapi/v1/premiumIndex'
-    # 2. 抓取週期資訊 (新的 API)
-    info_url = 'https://rate-rader.stkao891112.workers.dev/fapi/v1/fundingInfo'
-    
+def get_binance_funding_rates(assets, retries=3, retry_delay=1):
+    premium_url = 'https://fapi.binance.com/fapi/v1/premiumIndex'
+    info_url    = 'https://fapi.binance.com/fapi/v1/fundingInfo'
+
     if isinstance(assets, str):
         assets = [assets.upper()]
     else:
         assets = [a.upper() for a in assets]
 
-    final_data_list = []
-    
-    try:
-        # 同時請求兩個接口
-        p_res = requests.get(premium_url, timeout=10)
-        i_res = requests.get(info_url, timeout=10)
-        
-        if p_res.status_code == 200 and i_res.status_code == 200:
-            p_data = p_res.json()
-            i_data = i_res.json()
-            
-            # 建立週期字典 { "HYPEUSDT": 4, "BTCUSDT": 8 ... }
-            interval_map = {item['symbol']: item['fundingIntervalHours'] for item in i_data}
-            
-            # 建立費率字典 { "HYPE": {...} }
-            data_map = {}
-            for item in p_data:
-                symbol = item['symbol']
-                if symbol.endswith("USDT"):
-                    coin = symbol.replace("USDT", "")
-                    data_map[coin] = item
-            
-            # 按照 assets 順序提取
-            for coin in assets:
-                symbol = f"{coin}USDT"
-                if coin in data_map:
-                    item = data_map[coin]
-                    raw_rate = float(item.get('lastFundingRate', 0))
-                    
-                    # 從另一個 API 拿到週期，如果找不到則預設為 8
-                    interval = interval_map.get(symbol, 8)
-                    
-                    # --- 標準化邏輯 ---
-                    # 如果 interval 是 4, multiplier 就是 2 (8/4)
-                    # 把利率調整為 8 小時基準
-                    multiplier = 8 / interval
-                    standardized_rate = raw_rate * multiplier * 100
-                    
-                    percentage_rate = round(standardized_rate, 5)
-                    
-                    final_data_list.append({
-                        "exchange": "Binance",
-                        "symbol": coin,
-                        "rate": percentage_rate,
-                    })
-        else:
-            print("❌ 請求失敗")
-            
-    except Exception as e:
-        print(f"❌ 抓取錯誤: {e}")
+    for attempt in range(1, retries + 1):
+        try:
+            p_res = requests.get(premium_url, timeout=10)
+            i_res = requests.get(info_url, timeout=10)
 
-    return final_data_list
+            if p_res.status_code == 200 and i_res.status_code == 200:
+                p_data = p_res.json()
+                i_data = i_res.json()
+
+                interval_map = {item['symbol']: item['fundingIntervalHours'] for item in i_data}
+
+                data_map = {}
+                for item in p_data:
+                    symbol = item['symbol']
+                    if symbol.endswith("USDT"):
+                        coin = symbol.replace("USDT", "")
+                        data_map[coin] = item
+
+                final_data_list = []
+                for coin in assets:
+                    symbol = f"{coin}USDT"
+                    if coin in data_map:
+                        item = data_map[coin]
+                        raw_rate   = float(item.get('lastFundingRate', 0))
+                        interval   = interval_map.get(symbol, 8)
+                        multiplier = 8 / interval
+                        standardized_rate = raw_rate * multiplier * 100
+                        final_data_list.append({
+                            "exchange": "Binance",
+                            "symbol":   coin,
+                            "rate":     round(standardized_rate, 5),
+                        })
+                    else:
+                        final_data_list.append({
+                            "exchange": "Binance",
+                            "symbol":   coin,
+                            "rate":     "N/A",
+                        })
+
+                return final_data_list  # 成功直接回傳
+
+            else:
+                print(f"[Binance] 第 {attempt} 次請求失敗，狀態碼 p={p_res.status_code} i={i_res.status_code}")
+
+        except Exception as e:
+            print(f"[Binance] 第 {attempt} 次錯誤: {e}")
+
+        if attempt < retries:
+            time.sleep(retry_delay)  # 等一下再重試
+
+    # 全部重試失敗，回傳全 N/A
+    print(f"[Binance] 重試 {retries} 次全部失敗，回傳 N/A")
+    return [{"exchange": "Binance", "symbol": coin, "rate": "N/A"} for coin in assets]
+
 
 if __name__ == "__main__":
     test_assets = ["BTC", "ETH", "SOL", "HYPE"]
