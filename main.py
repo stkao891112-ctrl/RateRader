@@ -124,6 +124,12 @@ def funding():
 def health():
     return jsonify({'status': 'ok', 'cache_keys': len(_cache)})
 
+print("--- 程式開始讀取 ---")
+    # ... 你的 imports ...
+
+    # 在 app.run 之前加這行
+print("--- 準備進入 app.run ---")
+
 if __name__ == '__main__':
     # GCP 或一般生產環境建議 debug=False
     app.run(host='0.0.0.0', port=8080, debug=False)
