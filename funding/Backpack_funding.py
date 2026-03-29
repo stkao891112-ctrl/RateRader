@@ -38,7 +38,7 @@ def get_backpack_funding_rates(assets):
                     final_data_list.append({
                         "exchange": "Backpack",
                         "symbol": coin,
-                        "rate": formatted_rate,
+                        "USDC_rate": formatted_rate,
                         "interval": "8H"
                     })
                     continue

@@ -3,6 +3,7 @@ from flask_cors import CORS
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
+# 確保這些文件中的函數都已經回傳 {"USDT_rate": ..., "USDC_rate": ..., "USD_rate": ...}
 from funding.Binance_funding import get_binance_funding_rates
 from funding.OKX_funding import get_okx_funding_rates
 from funding.Bybit_funding import get_bybit_funding_rates
@@ -29,14 +30,19 @@ EXCHANGE_FETCHERS = {
 }
 
 def fetch_one(name, func, assets):
-    """單一交易所抓取，出錯回傳全 N/A 不影響其他交易所"""
+    """單一交易所抓取，出錯時回傳 None 格式避免崩潰"""
     try:
         data = func(assets)
         return name, data
     except Exception as e:
-        print(f'[{name}] error: {e}')
-        # 出錯時回傳每個幣都是 N/A
-        return name, [{'rate': 'N/A'} for _ in assets]
+        print(f'[{name}] 全局抓取錯誤: {e}')
+        # 構造錯誤時的空數據結構
+        error_data = [{
+            "USDT_rate": None,
+            "USDC_rate": None,
+            "USD_rate": None
+        } for _ in assets]
+        return name, error_data
 
 # ─── 首頁 ──────────────────────────────────────────────────────
 @app.route('/')
@@ -53,20 +59,22 @@ def funding():
     if not assets:
         return jsonify({'status': 'error', 'message': 'No assets provided'}), 400
 
-    # 2. Cache key
+    # 2. Cache key & 現在時間
     cache_key = ','.join(sorted(assets))
     now = time.time()
 
     # 3. 檢查快取
-    if cache_key in _cache and (now - _cache[cache_key]['ts']) < CACHE_TTL:
-        return jsonify({
-            'status': 'success',
-            'cached': True,
-            'age': int(now - _cache[cache_key]['ts']),
-            'data': _cache[cache_key]['data']
-        })
+    if cache_key in _cache:
+        cache_age = now - _cache[cache_key]['ts']
+        if cache_age < CACHE_TTL:
+            return jsonify({
+                'status': 'success',
+                'cached': True,
+                'age': int(cache_age),
+                'data': _cache[cache_key]['data']
+            })
 
-    # 4. 平行抓取所有交易所（同時發出，誰先好先收）
+    # 4. 平行抓取所有交易所
     results = {}
     with ThreadPoolExecutor(max_workers=len(EXCHANGE_FETCHERS)) as executor:
         futures = {
@@ -77,15 +85,32 @@ def funding():
             name, data = future.result()
             results[name] = data
 
-    # 5. 合併資料
+    # 5. 合併資料 (對齊各交易所的 USDT/USDC/USD)
     combined = {}
     for i, coin in enumerate(assets):
-        combined[coin] = {'Interval': '8H'}
+        combined[coin] = {
+            'Interval': '8H',
+            'Exchanges': {}
+        }
+        
         for ex_name in EXCHANGE_FETCHERS.keys():
-            data = results.get(ex_name, [])
-            combined[coin][ex_name] = data[i]['rate'] if i < len(data) else 'N/A'
+            ex_data_list = results.get(ex_name, [])
+            
+            # 安全取出該幣種在該交易所的數據
+            if i < len(ex_data_list):
+                item = ex_data_list[i]
+                # 兼容處理：有些舊腳本可能還沒改掉，增加預設值 get
+                combined[coin]['Exchanges'][ex_name] = {
+                    "USDT": item.get("USDT_rate"),
+                    "USDC": item.get("USDC_rate"),
+                    "USD":  item.get("USD_rate")
+                }
+            else:
+                combined[coin]['Exchanges'][ex_name] = {
+                    "USDT": None, "USDC": None, "USD": None
+                }
 
-    # 6. 存進快取
+    # 6. 存進快取並回傳
     _cache[cache_key] = {'ts': now, 'data': combined}
 
     return jsonify({
@@ -95,10 +120,10 @@ def funding():
         'data': combined
     })
 
-# ─── 健康檢查（GCP 負載均衡用）─────────────────────────────────
 @app.route('/health')
 def health():
     return jsonify({'status': 'ok', 'cache_keys': len(_cache)})
 
 if __name__ == '__main__':
+    # GCP 或一般生產環境建議 debug=False
     app.run(host='0.0.0.0', port=8080, debug=False)

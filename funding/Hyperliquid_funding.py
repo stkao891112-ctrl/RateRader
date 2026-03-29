@@ -52,7 +52,7 @@ def get_hyperliquid_funding_rates(assets):
                 final_data_list.append({
                     "exchange": "Hyperliquid",
                     "symbol": coin,
-                    "rate": str(found_record) if found_record is not None else "N/A",
+                    "USDC_rate": str(found_record) if found_record is not None else "N/A",
                     "interval": "8H"
                 })
         else:

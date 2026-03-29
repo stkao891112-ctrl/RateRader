@@ -1,69 +1,75 @@
 import requests
 import json
+import time
 from decimal import Decimal, getcontext
 
-# 設定全局精度（例如保留 10 位有效數字）
+# 設定精度
 getcontext().prec = 10
 
-def get_okx_funding_rates(assets):
+def get_okx_funding_rates(assets, retries=3, retry_delay=1):
+    # 使用你提供的批量接口
+    # 註：OKX V5 批量獲取費率的標準路徑通常是 /public/funding-rate-all 
+    # 或 /public/funding-rate?instId=ANY (取決於 OKX 具體端點更新)
     url = "https://www.okx.com/api/v5/public/funding-rate?instId=ANY"
+    
     target_assets = [a.upper() for a in assets]
-    temp_map = {}
+    
+    # 用於儲存所有從 API 抓回來的資料 (以 instId 為 key)
+    all_market_data = {}
 
-    try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            raw_data = response.json()
-            if raw_data.get('code') == '0':
-                for item in raw_data.get('data', []):
-                    inst_id = item['instId']
-                    if not inst_id.endswith("-USDT-SWAP"):
-                        continue
-                        
-                    coin = inst_id.split('-')[0]
-                    if coin in target_assets:
-                        # 使用 Decimal 處理時間與費率
-                        next_f = Decimal(item['nextFundingTime'])
-                        curr_f = Decimal(item['fundingTime'])
-                        
-                        # 精準計算週期
-                        diff_ms = next_f - curr_f
-                        interval_hrs = diff_ms / Decimal(3600000)
-                        
-                        if interval_hrs <= 0: interval_hrs = Decimal(8)
-                        
-                        # 精準標準化計算
-                        multiplier = Decimal(8) / interval_hrs
-                        raw_rate = Decimal(item['fundingRate'])
-                        
-                        # 最終百分比：raw_rate * multiplier * 100
-                        standardized_rate = (raw_rate * multiplier * Decimal(100))
-                        
-                        # 格式化為字串或四捨五入後的 float 供 JSON 回傳
-                        temp_map[coin] = {
-                            "exchange": "OKX",
-                            "symbol": coin,
-                            "rate": float(standardized_rate.quantize(Decimal('0.00001'))), # 保留 5 位小數
-                            "interval": "8H"
-                        }
-    except Exception as e:
-        print(f"❌ 精度計算錯誤: {e}")
+    for attempt in range(1, retries + 1):
+        try:
+            res = requests.get(url, timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                if data.get('code') == '0' and data.get('data'):
+                    # 將所有資料轉存入字典，加速後續查找
+                    for item in data['data']:
+                        all_market_data[item['instId']] = item
+                    break 
+            else:
+                print(f"[OKX] 第 {attempt} 次請求失敗，狀態碼: {res.status_code}")
+        except Exception as e:
+            print(f"[OKX] 第 {attempt} 次發生錯誤: {e}")
+        
+        if attempt < retries:
+            time.sleep(retry_delay)
 
-    # 依序回傳
-    return [temp_map.get(coin, {"symbol": coin, "rate": "N/A"}) for coin in target_assets]
-# --- 這裡就是你要加入的地方 ---
+    # 封裝結果
+    final_results = []
+    for coin in target_assets:
+        def process_rate(inst_id):
+            item = all_market_data.get(inst_id)
+            if item:
+                try:
+                    # 週期與標準化計算
+                    next_f = Decimal(item['nextFundingTime'])
+                    curr_f = Decimal(item['fundingTime'])
+                    diff_ms = next_f - curr_f
+                    
+                    interval_hrs = diff_ms / Decimal(3600000)
+                    if interval_hrs <= 0: interval_hrs = Decimal(8)
+                    
+                    multiplier = Decimal(8) / interval_hrs
+                    raw_rate = Decimal(item['fundingRate'])
+                    
+                    return float((raw_rate * multiplier * Decimal(100)).quantize(Decimal('0.00001')))
+                except:
+                    return None
+            return None
+
+        final_results.append({
+            "exchange": "OKX",
+            "symbol": coin,
+            "USDT_rate": process_rate(f"{coin}-USDT-SWAP"),
+            "USDC_rate": process_rate(f"{coin}-USD_UM-SWAP"),
+            "USD_rate":  process_rate(f"{coin}-USD-SWAP")
+        })
+
+    return final_results
 
 if __name__ == "__main__":
-    # 1. 定義你想抓取的代幣清單
-    my_assets = ["BTC", "ETH", "SOL", "HYPE"]
-    
-    
-    # 2. 呼叫你寫好的函式
+    # 測試執行
+    my_assets = ["BTC", "ETH", "SOL", "HYPE", "LIT"]
     results = get_okx_funding_rates(my_assets)
-    
-    # 3. 將結果印出來看
-    print("\n--- 抓取結果 ---")
-    print(json.dumps(results, indent=4))
-    
-    # 為了防止視窗秒縮，可以加這行（選用）
-    # input("\n按 Enter 鍵結束程式...")
+    print(json.dumps(results, indent=4, ensure_ascii=False))

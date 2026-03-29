@@ -157,6 +157,47 @@ td:not(:first-child) { width: 120px; min-width: 120px; max-width: 120px; text-al
 }
 .coin-name { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--text); }
 
+/* 多交易對樣式 */
+.multi-pair-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 24px; /* 稍微縮小行間距 */
+  padding: 12px 4px;
+}
+
+.pair-row {
+  display: grid;
+  /* 第一欄固定 45px 放標籤，第二欄 1fr 佔滿剩餘空間 */
+  grid-template-columns: 45px 1fr;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.pair-label {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  text-align: left; /* 標籤絕對靠左 */
+  font-weight: normal;
+  color: var(--muted);
+  /* 移除原本的 min-width，改由 grid 控制 */
+}
+
+/* 針對費率數值的容器：在 Grid 第二欄中置中 */
+.pair-row .rate-pos, 
+.pair-row .rate-neg, 
+.pair-row .rate-na, 
+.pair-row .rate-zero {
+  text-align: center;
+  width: 100%;
+  /* 視覺補償：因為左邊有標籤，右邊稍微加一點 padding 讓數字看起來更在格子中間 */
+  padding-right: 50px; 
+}
+
+.pair-label.usdt { color: #00c97a; }
+.pair-label.usdc { color: #5b9dff; }
+.pair-label.coinm { color: #ffaa00; font-size: 7px; } /* Coin-M 字多，縮小一點點 */
+
 tbody tr:hover td { background: var(--bg3); }
 tbody tr:hover td:first-child { background: #232328; }
 
@@ -194,121 +235,117 @@ tbody tr:hover td:first-child { background: #232328; }
   .period-btn { font-size: 8px; padding: 5px 10px; }
   .section-label { font-size: 7px; }
   .countdown { font-size: 7px; }
-  .scroll-hint { font-size: 8px; }
-
-  th { font-size: 8px; padding: 8px 6px; }
-  th:first-child, td:first-child { width: 100px; min-width: 100px; max-width: 100px; }
-  th:not(:first-child), td:not(:first-child) { width: 78px; min-width: 78px; max-width: 78px; }
-  td:not(:first-child) { padding: 8px 4px; }
-  .coin-cell { padding: 8px 4px 8px 6px; gap: 5px; }
-  .coin-icon, [style*="width:32px"] { width: 22px !important; height: 22px !important; }
-  .coin-name { font-size: 7px; letter-spacing: 0; }
-  .rate-pos, .rate-neg, .rate-zero { font-size: 9px; }
-  .rate-na { font-size: 8px; }
-  .best-badge { font-size: 7px; padding: 1px 3px; }
+  th { font-size: 8px; padding: 10px 8px; }
+  td:not(:first-child) { padding: 10px 6px; }
+  .coin-cell { padding: 8px 6px 8px 10px; gap: 7px; }
+  .coin-icon, .coin-icon-placeholder { width: 24px; height: 24px; font-size: 8px; }
+  .coin-name { font-size: 9px; }
+  .rate-pos, .rate-neg { font-size: 10px; }
+  .rate-na { font-size: 9px; }
+  .pair-label { font-size: 7px; min-width: 28px; }
+  .multi-pair-cell { gap: 6px; padding: 8px 4px; }
+  .pair-row { gap: 6px; }
 }
 </style>
 </head>
 <body>
 <div id="app">
 
-  <div class="header">
-    <div class="logo">&#9670; Funding Rates</div>
-    <div class="status-row">
-      <div class="dot" id="status-dot"></div>
-      <span class="last-update" id="last-update">--</span>
-    </div>
+<div class="header">
+  <div class="logo">● Funding Rates</div>
+  <div class="status-row">
+    <div class="dot" id="status-dot"></div>
+    <div class="last-update" id="last-update">fetching...</div>
   </div>
+</div>
 
-  <div class="controls">
-    <div class="tag-input-wrap">
-      <input id="coin-input" placeholder="Add coin (e.g. PEPE)" maxlength="12" />
-      <button class="btn" onclick="addCoinFromInput()">+ Add</button>
-    </div>
+<div class="controls">
+  <div class="tag-input-wrap">
+    <input id="coin-input" type="text" placeholder="Add coin (e.g. PEPE)" autocomplete="off">
+    <button class="btn primary" onclick="addCoinFromInput()">+ Add</button>
   </div>
+</div>
 
-  <div class="filter-label">Filter coins</div>
-  <div class="chips-wrap" id="chips-wrap"></div>
+<div class="filter-label">FILTER COINS</div>
+<div class="chips-wrap" id="chips-wrap"></div>
 
-  <div class="period-wrap">
-    <button class="period-btn active" onclick="setPeriod('8H', this)">8H</button>
-    <button class="period-btn" onclick="setPeriod('1D', this)">1D</button>
-    <button class="period-btn" onclick="setPeriod('1M', this)">1M</button>
-    <button class="period-btn" onclick="setPeriod('1Y', this)">1Y</button>
+<div class="period-wrap">
+  <button class="period-btn" onclick="setPeriod('5H')">5H</button>
+  <button class="period-btn" onclick="setPeriod('1D')">1D</button>
+  <button class="period-btn active" onclick="setPeriod('1Y')">1Y</button>
+</div>
+
+<div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
+
+<div class="meta-row">
+  <div class="section-label" id="period-label">Live rates — 1Y</div>
+  <div class="countdown" id="countdown">auto-refresh in 30s</div>
+</div>
+
+<div class="scroll-hint" id="scroll-hint">
+  <span>← swipe to see more →</span>
+</div>
+
+<div class="table-outer" id="table-outer">
+  <div class="table-scroll-wrap" id="scroll-wrap">
+    <table>
+      <thead><tr id="thead-row"></tr></thead>
+      <tbody id="rate-tbody"></tbody>
+    </table>
   </div>
-
-  <div class="timer-bar"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
-  <div class="meta-row">
-    <div class="section-label" id="period-label">Live rates &mdash; 8H</div>
-    <span class="countdown" id="countdown"></span>
-  </div>
-  <div class="scroll-hint" id="scroll-hint">&#8594; slide to see all exchanges</div>
-
-  <div class="table-outer" id="table-outer">
-    <div class="table-scroll-wrap" id="scroll-wrap">
-      <table>
-        <thead><tr id="thead-row"></tr></thead>
-        <tbody id="rate-tbody"></tbody>
-      </table>
-    </div>
-  </div>
+</div>
 
 </div>
+
 <script>
-const API_BASE    = '';
-const PERIOD_MULT = { '8H': 1, '1D': 3, '1M': 90, '1Y': 1095 };
-let currentPeriod = '8H';
-
-function setPeriod(p, el) {
-  currentPeriod = p;
-  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  renderTable(rateData);
-}
-
+// ── Config ────────────────────────────────────────────────────
+const API_BASE = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') 
+                 ? '' 
+                 : 'https://api.jup.ag';
 const REFRESH_SEC = 30;
-let   EXCHANGES   = ['Binance','OKX','Bybit','Bitget','Backpack','Hyperliquid'];
+const EXCHANGES   = ['Binance','OKX','Bybit','Bitget','Backpack','Hyperliquid'];
 
-const ALL_COINS = ['BTC','ETH','SOL','HYPE','PAXG','XAUT','BNB','XRP','AAVE','DOGE','ADA','SUI','TAO','UNI','DOT','LIT'];
+// 定義哪些幣種需要顯示多交易對
+const MULTI_PAIR_COINS = ['BTC', 'ETH', 'SOL'];
+const TRADING_PAIRS = ['USDT', 'USDC', 'COIN-M'];
 
-const ICON_MAP = {
-  BTC:  'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
-  ETH:  'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
-  SOL:  'https://assets.coingecko.com/coins/images/4128/small/solana.png',
-  HYPE: 'https://assets.coingecko.com/coins/images/50882/standard/hyperliquid.jpg?1729431300',
-  PAXG: 'https://assets.coingecko.com/coins/images/9519/small/paxg.PNG',
-  XAUT: 'https://assets.coingecko.com/coins/images/10481/small/Tether_Gold.png',
-  BNB:  'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png',
-  XRP:  'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png',
-  AAVE: 'https://assets.coingecko.com/coins/images/12645/small/AAVE.png',
-  DOGE: 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png',
-  ADA:  'https://assets.coingecko.com/coins/images/975/small/cardano.png',
-  SUI:  'https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg',
-  TAO:  'https://assets.coingecko.com/coins/images/28452/small/ARUsPeNQ_400x400.jpeg',
-  UNI:  'https://assets.coingecko.com/coins/images/12504/small/uniswap-uni.png',
-  DOT:  'https://assets.coingecko.com/coins/images/12171/small/polkadot.png',
-  LIT:  'https://assets.coingecko.com/coins/images/71121/standard/lighter.png?1765888098',
-  LINK: 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
-  AVAX: 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png',
-  NEAR: 'https://assets.coingecko.com/coins/images/10365/small/near.jpg',
-  APT:  'https://assets.coingecko.com/coins/images/26455/small/aptos_round.png',
-  ARB:  'https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg',
-  OP:   'https://assets.coingecko.com/coins/images/25244/small/Optimism.png',
-  PEPE: 'https://assets.coingecko.com/coins/images/29850/small/pepe-token.jpeg',
-  LTC:  'https://assets.coingecko.com/coins/images/2/small/litecoin.png',
-  ATOM: 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png',
-  TRX:  'https://assets.coingecko.com/coins/images/1094/small/tron-logo.png',
+// 定義每個交易所的預設交易對
+const EXCHANGE_DEFAULTS = {
+  'Binance': 'USDT',
+  'OKX': 'USDT',
+  'Bybit': 'USDT',
+  'Bitget': 'USDT',
+  'Backpack': 'USDC',
+  'Hyperliquid': 'USDC'
 };
 
-// 所有已知幣種（包含動態新增的）
-let allCoins   = [...ALL_COINS];
-// 目前篩選顯示的幣種（null = 全部）
-let activeSet  = new Set(ALL_COINS);
-let allActive  = true;
+const PERIOD_MULT = { '5H': 1, '1D': 3, '1Y': 1095 };
+const ICON_MAP = {
+  BTC:  'https://assets.coingecko.com/coins/images/1/standard/bitcoin.png',
+  ETH:  'https://assets.coingecko.com/coins/images/279/standard/ethereum.png',
+  SOL:  'https://assets.coingecko.com/coins/images/4128/standard/solana.png',
+  HYPE: 'https://assets.coingecko.com/coins/images/50882/standard/hyperliquid.jpg?1729431300',
+  PAXG: 'https://assets.coingecko.com/coins/images/9519/small/paxg.PNG',
+  XAUT: 'https://assets.coingecko.com/coins/images/10481/standard/Tether_Gold.png',
+  BNB:  'https://assets.coingecko.com/coins/images/825/standard/bnb-icon2_2x.png',
+  XRP:  'https://assets.coingecko.com/coins/images/44/standard/xrp-symbol-white-128.png',
+  AAVE: 'https://assets.coingecko.com/coins/images/12645/standard/aave-token-round.png',
+  DOGE: 'https://assets.coingecko.com/coins/images/5/standard/dogecoin.png',
+  ADA:  'https://assets.coingecko.com/coins/images/975/standard/cardano.png',
+  SUI:  'https://assets.coingecko.com/coins/images/26375/standard/sui_asset.jpeg',
+  TAO:  'https://assets.coingecko.com/coins/images/28452/standard/ARUsPeNQ_400x400.jpeg',
+  UNI:  'https://assets.coingecko.com/coins/images/12504/standard/uni.jpg',
+  DOT:  'https://assets.coingecko.com/coins/images/12171/standard/polkadot.png',
+  LIT:  'https://assets.coingecko.com/coins/images/71121/standard/lighter.png?1765888098'
+};
 
-let rateData   = {};
-let timer      = REFRESH_SEC;
-let countdownId = null;
+let allCoins      = ['BTC','ETH','SOL','HYPE','PAXG','XAUT','BNB','XRP','AAVE','DOGE','ADA','SUI','TAO','UNI','DOT','LIT'];
+let activeSet     = new Set(allCoins);
+let allActive     = true;
+let currentPeriod = '1Y';
+let rateData      = {};
+let timer         = REFRESH_SEC;
+let countdownId   = null;
 
 // ── Icon helpers ──────────────────────────────────────────────
 function iconUrl(sym) { return ICON_MAP[sym.toUpperCase()] || null; }
@@ -353,7 +390,6 @@ function toggleAll() {
 
 function toggleChip(c) {
   if (allActive) {
-    // 第一次點單一幣：取消全選，只顯示這一個
     allActive = false;
     activeSet = new Set([c]);
   } else {
@@ -395,7 +431,8 @@ function parseRate(raw) {
   const n = parseFloat(String(raw).replace('%',''));
   return isNaN(n) ? null : n;
 }
-function formatRate(raw) {
+
+function formatRate(raw, compact = false) {
   const n = parseRate(raw);
   if (n === null) return '<span class="rate-na">—</span>';
   const v    = n * PERIOD_MULT[currentPeriod];
@@ -404,34 +441,75 @@ function formatRate(raw) {
   const decimals = currentPeriod === '8H' ? 4 : currentPeriod === '1D' ? 4 : 2;
   return `<span class="${cls}">${sign}${v.toFixed(decimals)}%</span>`;
 }
+
 function findBest(coinObj) {
   let best = null, bestVal = -Infinity;
   EXCHANGES.forEach(ex => { const n = parseRate(coinObj[ex]); if(n!==null && n>bestVal){bestVal=n;best=ex;} });
   return bestVal > 0 ? best : null;
 }
 
+// ── Period switching ──────────────────────────────────────────
+function setPeriod(p) {
+  currentPeriod = p;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderTable(rateData);
+}
+
 // ── Render table ──────────────────────────────────────────────
 function renderTable(data) {
   const lbl = document.getElementById('period-label');
   if (lbl) lbl.textContent = 'Live rates — ' + currentPeriod;
-  const tbody  = document.getElementById('rate-tbody');
+  const tbody = document.getElementById('rate-tbody');
   const visible = allCoins.filter(c => activeSet.has(c));
+  
   if (!visible.length) {
-    tbody.innerHTML = `<tr><td colspan="${EXCHANGES.length+1}"
-      style="text-align:center;color:var(--muted);padding:28px">No coins selected</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${EXCHANGES.length+1}" style="text-align:center;color:var(--muted);padding:28px">No coins selected</td></tr>`;
     return;
   }
+  
   tbody.innerHTML = visible.map(coin => {
-    const row      = data[coin];
-    const coinCell = `<td><div style="display:flex;align-items:center;gap:10px;padding:12px 10px 12px 14px">
-      ${iconImg(coin,32)}<span class="coin-name">${coin}</span></div></td>`;
-    if (!row) return `<tr>${coinCell}${EXCHANGES.map(()=>'<td><span class="skeleton"></span></td>').join('')}</tr>`;
-    const best  = findBest(row);
-    const cells = EXCHANGES.map(ex =>
-      `<td>${formatRate(row[ex])}${ex===best?'<span class="best-badge">best</span>':''}</td>`
-    ).join('');
+    const coinData = data[coin];
+    const coinCell = `<td><div class="coin-cell">${iconImg(coin,32)}<span class="coin-name">${coin}</span></div></td>`;
+    
+    if (!coinData) {
+      return `<tr>${coinCell}${EXCHANGES.map(()=>'<td><span class="skeleton"></span></td>').join('')}</tr>`;
+    }
+
+    // 判斷是否為需要顯示多交易對的幣種 (BTC, ETH, SOL)
+    const isMultiPair = MULTI_PAIR_COINS.includes(coin);
+    
+    const cells = EXCHANGES.map(ex => {
+      const exRates = coinData['Exchanges'] ? coinData['Exchanges'][ex] : null;
+      
+      if (!exRates) return '<td><span class="rate-na">—</span></td>';
+
+      // 🚀 邏輯 1: 針對特定交易所 (Backpack, Hyperliquid) 永遠顯示單一數值
+      if (ex === 'Backpack' || ex === 'Hyperliquid') {
+        // 優先抓 USDC (這兩家主要是 USDC)，如果沒有則抓 USDT
+        const singleRate = exRates.USDC !== null ? exRates.USDC : exRates.USDT;
+        return `<td style="text-align:center;">${formatRate(singleRate)}</td>`;
+      }
+
+      // 🚀 邏輯 2: 針對 BTC/ETH/SOL 且是四大交易所，顯示三行排版
+      if (isMultiPair) {
+        return `<td>
+          <div class="multi-pair-cell">
+            <div class="pair-row"><span class="pair-label usdt">USDT</span>${formatRate(exRates.USDT, true)}</div>
+            <div class="pair-row"><span class="pair-label usdc">USDC</span>${formatRate(exRates.USDC, true)}</div>
+            <div class="pair-row"><span class="pair-label coinm">Coin-M</span>${formatRate(exRates.USD, true)}</div>
+          </div>
+        </td>`;
+      } else {
+        // 一般幣種顯示
+        const primaryRate = exRates.USDT !== null ? exRates.USDT : exRates.USDC;
+        return `<td style="text-align:center;">${formatRate(primaryRate)}</td>`;
+      }
+    }).join('');
+    
     return `<tr>${coinCell}${cells}</tr>`;
   }).join('');
+  
   checkScrollable();
 }
 
@@ -476,7 +554,6 @@ async function fetchRates() {
   }
   resetTimer();
 }
-
 
 // ── Countdown ─────────────────────────────────────────────────
 function resetTimer() { timer = REFRESH_SEC; updateTimerUI(); }
