@@ -8,7 +8,6 @@
 <meta name="apple-mobile-web-app-title" content="Funding">
 <meta name="theme-color" content="#161618">
 <title>Funding Rates</title>
-<link rel="manifest" href="/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -527,30 +526,41 @@ function setStatus(s) {
 }
 
 // ── Fetch ─────────────────────────────────────────────────────
+let isFetching = false; // 🚀 1. 新增全域鎖定旗標
+
 async function fetchRates() {
-  if (!allCoins.length) return;
+  if (!allCoins.length || isFetching) return; // 🚀 2. 如果正在抓取中，直接擋掉
+  
+  isFetching = true; // 🔒 上鎖
   setStatus('loading');
   document.getElementById('last-update').textContent = 'fetching...';
+  
   const isFirstLoad = Object.keys(rateData).length === 0;
+  // 只有第一次加載才顯示 skeleton，避免之後每次更新都閃爍
   if (isFirstLoad) renderTable({});
+
   try {
     const url = `${API_BASE}/api/funding?assets=${allCoins.join(',')}`;
-    const res  = await fetch(url);
+    const res = await fetch(url);
     const json = await res.json();
+    
     if (json.status === 'success') {
       rateData = json.data;
-      renderTable(rateData);
+      renderTable(rateData); // ✅ 成功拿到所有數據後，才一次性渲染
       setStatus('ok');
       const t = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
       const c = json.cached ? `<span class="cache-badge">cached ${json.age}s ago</span>` : '';
       document.getElementById('last-update').innerHTML = t + c;
     } else throw new Error();
   } catch(e) {
+    console.error("Fetch failed:", e);
     setStatus('error');
     document.getElementById('last-update').textContent = 'connection error';
-    renderTable(rateData);
+  } finally {
+    isFetching = false; // 🔓 解鎖
+    timer = REFRESH_SEC; // 🚀 3. 直接重置倒數秒數，不要在這裡重開 Interval
+    updateTimerUI();
   }
-  resetTimer();
 }
 
 // ── Countdown ─────────────────────────────────────────────────
@@ -560,11 +570,18 @@ function updateTimerUI() {
   document.getElementById('countdown').textContent  = `auto-refresh in ${timer}s`;
 }
 function startCountdown() {
-  clearInterval(countdownId);
+  if (countdownId) clearInterval(countdownId); // 確保只有一個定時器在跑
+  
   countdownId = setInterval(() => {
+    // 🚀 關鍵：如果正在抓取中，秒數凍結不倒數，避免過期重複觸發
+    if (isFetching) return; 
+
     timer--;
-    if (timer <= 0) { fetchRates(); return; }
-    updateTimerUI();
+    if (timer <= 0) {
+      fetchRates(); 
+    } else {
+      updateTimerUI();
+    }
   }, 1000);
 }
 
