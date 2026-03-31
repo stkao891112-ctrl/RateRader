@@ -1,11 +1,12 @@
 {
   "builds": [
-    { "src": "main.py", "use": "@vercel/python" }
+    { "src": "main.py", "use": "@vercel/python" },
+    { "src": "api/proxy.js", "use": "@vercel/edge" }
   ],
   "routes": [
+    { "src": "/api/proxy", "dest": "api/proxy.js" },
     { "src": "/(.*)", "dest": "main.py" }
   ],
-  "regions": ["hnd1"],
   "env": {
     "PYTHON_VERSION": "3.11"
   }
