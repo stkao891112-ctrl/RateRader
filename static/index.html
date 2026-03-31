@@ -88,12 +88,49 @@ html, body { background: var(--bg); color: var(--text); font-family: var(--mono)
 }
 .chip:active { opacity: 0.7; }
 .chip-all {
-  background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 4px; padding: 6px 12px;
-  cursor: pointer; font-size: 9px; letter-spacing: 1px;
-  color: var(--sub); user-select: none;
+  /* --- 以下為新增的置中邏輯 --- */
+  display: flex;
+  align-items: center;      /* 垂直置中 */
+  justify-content: center;   /* 水平置中 */
+  
+  /* --- 以下是您原本的設定，保持不動 --- */
+  background: var(--bg3); 
+  border: 1px solid var(--border);
+  border-radius: 4px; 
+  padding: 6px 12px;
+  cursor: pointer; 
+  font-size: 9px; 
+  letter-spacing: 1px;
+  color: var(--sub); 
+  user-select: none;
 }
-.chip-all.active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,160,0.07); }
+
+.chip-all.active { 
+  border-color: var(--accent); 
+  color: var(--accent); 
+  background: rgba(0,229,160,0.07); 
+  
+  /* 確保啟動狀態也繼承置中 (通常上面寫了這裡就不需要重複，但寫了更保險) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Exchange chips (新增) ── */
+.exchange-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 4px; padding: 14px 9px;
+  cursor: pointer; font-size: 9px; color: var(--sub);
+  transition: border-color 0.15s, color 0.15s;
+  user-select: none;
+  letter-spacing: 0.5px;
+}
+.exchange-chip.active {
+  border-color: var(--accent); color: var(--text);
+  background: rgba(0,229,160,0.07);
+}
+.exchange-chip:active { opacity: 0.7; }
 
 /* ── Period switcher ── */
 .period-wrap {
@@ -160,13 +197,12 @@ td:not(:first-child) { width: 120px; min-width: 120px; max-width: 120px; text-al
 .multi-pair-cell {
   display: flex;
   flex-direction: column;
-  gap: 24px; /* 稍微縮小行間距 */
+  gap: 24px;
   padding: 12px 4px;
 }
 
 .pair-row {
   display: grid;
-  /* 第一欄固定 45px 放標籤，第二欄 1fr 佔滿剩餘空間 */
   grid-template-columns: 45px 1fr;
   align-items: center;
   gap: 4px;
@@ -176,26 +212,23 @@ td:not(:first-child) { width: 120px; min-width: 120px; max-width: 120px; text-al
 .pair-label {
   font-size: 8px;
   letter-spacing: 0.5px;
-  text-align: left; /* 標籤絕對靠左 */
+  text-align: left;
   font-weight: normal;
   color: var(--muted);
-  /* 移除原本的 min-width，改由 grid 控制 */
 }
 
-/* 針對費率數值的容器：在 Grid 第二欄中置中 */
 .pair-row .rate-pos, 
 .pair-row .rate-neg, 
 .pair-row .rate-na, 
 .pair-row .rate-zero {
   text-align: center;
   width: 100%;
-  /* 視覺補償：因為左邊有標籤，右邊稍微加一點 padding 讓數字看起來更在格子中間 */
   padding-right: 50px; 
 }
 
 .pair-label.usdt { color: #00c97a; }
 .pair-label.usdc { color: #5b9dff; }
-.pair-label.coinm { color: #ffaa00; font-size: 7px; } /* Coin-M 字多，縮小一點點 */
+.pair-label.coinm { color: #ffaa00; font-size: 7px; }
 
 tbody tr:hover td { background: var(--bg3); }
 tbody tr:hover td:first-child { background: #232328; }
@@ -231,6 +264,7 @@ tbody tr:hover td:first-child { background: #232328; }
   .chip { font-size: 8px; padding: 4px 7px 4px 5px; gap: 5px; }
   .chip img, .chip .chip-icon-placeholder { width: 16px; height: 16px; }
   .chip-all { font-size: 8px; padding: 4px 8px; }
+  .exchange-chip { font-size: 7px; padding: 4px 7px; }
   .period-btn { font-size: 8px; padding: 5px 10px; }
   .section-label { font-size: 7px; }
   .countdown { font-size: 7px; }
@@ -241,9 +275,6 @@ tbody tr:hover td:first-child { background: #232328; }
   .coin-name { font-size: 9px; }
   .rate-pos, .rate-neg { font-size: 10px; }
   .rate-na { font-size: 9px; }
-  .pair-label { font-size: 7px; min-width: 28px; }
-  .multi-pair-cell { gap: 6px; padding: 8px 4px; }
-  .pair-row { gap: 6px; }
 }
 </style>
 </head>
@@ -268,8 +299,12 @@ tbody tr:hover td:first-child { background: #232328; }
 <div class="filter-label">FILTER COINS</div>
 <div class="chips-wrap" id="chips-wrap"></div>
 
+<!-- 🚀 新增：交易所篩選區 -->
+<div class="filter-label">FILTER EXCHANGES</div>
+<div class="chips-wrap" id="exchange-chips-wrap"></div>
+
 <div class="period-wrap">
-  <button class="period-btn" onclick="setPeriod('5H')">5H</button>
+  <button class="period-btn" onclick="setPeriod('8H')">8H</button>
   <button class="period-btn" onclick="setPeriod('1D')">1D</button>
   <button class="period-btn active" onclick="setPeriod('1Y')">1Y</button>
 </div>
@@ -301,22 +336,8 @@ tbody tr:hover td:first-child { background: #232328; }
 const API_BASE = '';
 const REFRESH_SEC = 30;
 const EXCHANGES   = ['Binance','OKX','Bybit','Bitget','Backpack','Hyperliquid'];
-
-// 定義哪些幣種需要顯示多交易對
 const MULTI_PAIR_COINS = ['BTC', 'ETH', 'SOL'];
-const TRADING_PAIRS = ['USDT', 'USDC', 'COIN-M'];
-
-// 定義每個交易所的預設交易對
-const EXCHANGE_DEFAULTS = {
-  'Binance': 'USDT',
-  'OKX': 'USDT',
-  'Bybit': 'USDT',
-  'Bitget': 'USDT',
-  'Backpack': 'USDC',
-  'Hyperliquid': 'USDC'
-};
-
-const PERIOD_MULT = { '5H': 1, '1D': 3, '1Y': 1095 };
+const PERIOD_MULT = { '8H': 1, '1D': 3, '1Y': 1095 };
 const ICON_MAP = {
   BTC:  'https://assets.coingecko.com/coins/images/1/standard/bitcoin.png',
   ETH:  'https://assets.coingecko.com/coins/images/279/standard/ethereum.png',
@@ -339,10 +360,16 @@ const ICON_MAP = {
 let allCoins      = ['BTC','ETH','SOL','HYPE','PAXG','XAUT','BNB','XRP','AAVE','DOGE','ADA','SUI','TAO','UNI','DOT','LIT'];
 let activeSet     = new Set(allCoins);
 let allActive     = true;
+
+// 🚀 新增：交易所狀態管理
+let activeExchanges = new Set(EXCHANGES);
+let allExchangesActive = true;
+
 let currentPeriod = '1Y';
 let rateData      = {};
 let timer         = REFRESH_SEC;
 let countdownId   = null;
+let isFetching    = false;
 
 // ── Icon helpers ──────────────────────────────────────────────
 function iconUrl(sym) { return ICON_MAP[sym.toUpperCase()] || null; }
@@ -359,11 +386,12 @@ function iconImg(sym, size) {
 
 // ── Header ────────────────────────────────────────────────────
 function buildHeader() {
+  const visibleExchanges = EXCHANGES.filter(ex => activeExchanges.has(ex));
   document.getElementById('thead-row').innerHTML =
-    '<th>Coin</th>' + EXCHANGES.map(e => `<th>${e}</th>`).join('');
+    '<th>Coin</th>' + visibleExchanges.map(e => `<th>${e}</th>`).join('');
 }
 
-// ── Chips ─────────────────────────────────────────────────────
+// ── Coin Chips ────────────────────────────────────────────────
 function renderChips() {
   const wrap = document.getElementById('chips-wrap');
   const allCls = allActive ? 'chip-all active' : 'chip-all';
@@ -399,6 +427,45 @@ function toggleChip(c) {
     }
   }
   renderChips();
+  renderTable(rateData);
+}
+
+// 🚀 新增：交易所 Chips ─────────────────────────────────────────
+function renderExchangeChips() {
+  const wrap = document.getElementById('exchange-chips-wrap');
+  const allCls = allExchangesActive ? 'chip-all active' : 'chip-all';
+  let html = `<div class="${allCls}" onclick="toggleAllExchanges()">All</div>`;
+  html += EXCHANGES.map(ex => {
+    const cls = activeExchanges.has(ex) ? 'exchange-chip active' : 'exchange-chip';
+    return `<div class="${cls}" onclick="toggleExchange('${ex}')">${ex}</div>`;
+  }).join('');
+  wrap.innerHTML = html;
+}
+
+function toggleAllExchanges() {
+  allExchangesActive = true;
+  activeExchanges = new Set(EXCHANGES);
+  renderExchangeChips();
+  buildHeader();
+  renderTable(rateData);
+}
+
+function toggleExchange(ex) {
+  if (allExchangesActive) {
+    // 第一次點單一交易所：取消全選，只顯示這一個
+    allExchangesActive = false;
+    activeExchanges = new Set([ex]);
+  } else {
+    if (activeExchanges.has(ex)) {
+      activeExchanges.delete(ex);
+      if (activeExchanges.size === 0) { toggleAllExchanges(); return; }
+    } else {
+      activeExchanges.add(ex);
+      if (activeExchanges.size === EXCHANGES.length) { allExchangesActive = true; }
+    }
+  }
+  renderExchangeChips();
+  buildHeader();
   renderTable(rateData);
 }
 
@@ -459,9 +526,10 @@ function renderTable(data) {
   if (lbl) lbl.textContent = 'Live rates — ' + currentPeriod;
   const tbody = document.getElementById('rate-tbody');
   const visible = allCoins.filter(c => activeSet.has(c));
+  const visibleExchanges = EXCHANGES.filter(ex => activeExchanges.has(ex));
   
   if (!visible.length) {
-    tbody.innerHTML = `<tr><td colspan="${EXCHANGES.length+1}" style="text-align:center;color:var(--muted);padding:28px">No coins selected</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${visibleExchanges.length+1}" style="text-align:center;color:var(--muted);padding:28px">No coins selected</td></tr>`;
     return;
   }
   
@@ -470,25 +538,23 @@ function renderTable(data) {
     const coinCell = `<td><div class="coin-cell">${iconImg(coin,32)}<span class="coin-name">${coin}</span></div></td>`;
     
     if (!coinData) {
-      return `<tr>${coinCell}${EXCHANGES.map(()=>'<td><span class="skeleton"></span></td>').join('')}</tr>`;
+      return `<tr>${coinCell}${visibleExchanges.map(()=>'<td><span class="skeleton"></span></td>').join('')}</tr>`;
     }
 
-    // 判斷是否為需要顯示多交易對的幣種 (BTC, ETH, SOL)
     const isMultiPair = MULTI_PAIR_COINS.includes(coin);
     
-    const cells = EXCHANGES.map(ex => {
+    const cells = visibleExchanges.map(ex => {
       const exRates = coinData['Exchanges'] ? coinData['Exchanges'][ex] : null;
       
       if (!exRates) return '<td><span class="rate-na">—</span></td>';
 
-      // 🚀 邏輯 1: 針對特定交易所 (Backpack, Hyperliquid) 永遠顯示單一數值
+      // 針對 Backpack, Hyperliquid 永遠顯示單一數值
       if (ex === 'Backpack' || ex === 'Hyperliquid') {
-        // 優先抓 USDC (這兩家主要是 USDC)，如果沒有則抓 USDT
         const singleRate = exRates.USDC !== null ? exRates.USDC : exRates.USDT;
         return `<td style="text-align:center;">${formatRate(singleRate)}</td>`;
       }
 
-      // 🚀 邏輯 2: 針對 BTC/ETH/SOL 且是四大交易所，顯示三行排版
+      // 針對 BTC/ETH/SOL 且是四大交易所，顯示三行排版
       if (isMultiPair) {
         return `<td>
           <div class="multi-pair-cell">
@@ -498,7 +564,6 @@ function renderTable(data) {
           </div>
         </td>`;
       } else {
-        // 一般幣種顯示
         const primaryRate = exRates.USDT !== null ? exRates.USDT : exRates.USDC;
         return `<td style="text-align:center;">${formatRate(primaryRate)}</td>`;
       }
@@ -526,17 +591,14 @@ function setStatus(s) {
 }
 
 // ── Fetch ─────────────────────────────────────────────────────
-let isFetching = false; // 🚀 1. 新增全域鎖定旗標
-
 async function fetchRates() {
-  if (!allCoins.length || isFetching) return; // 🚀 2. 如果正在抓取中，直接擋掉
+  if (!allCoins.length || isFetching) return;
   
-  isFetching = true; // 🔒 上鎖
+  isFetching = true;
   setStatus('loading');
   document.getElementById('last-update').textContent = 'fetching...';
   
   const isFirstLoad = Object.keys(rateData).length === 0;
-  // 只有第一次加載才顯示 skeleton，避免之後每次更新都閃爍
   if (isFirstLoad) renderTable({});
 
   try {
@@ -546,7 +608,7 @@ async function fetchRates() {
     
     if (json.status === 'success') {
       rateData = json.data;
-      renderTable(rateData); // ✅ 成功拿到所有數據後，才一次性渲染
+      renderTable(rateData);
       setStatus('ok');
       const t = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
       const c = json.cached ? `<span class="cache-badge">cached ${json.age}s ago</span>` : '';
@@ -557,8 +619,8 @@ async function fetchRates() {
     setStatus('error');
     document.getElementById('last-update').textContent = 'connection error';
   } finally {
-    isFetching = false; // 🔓 解鎖
-    timer = REFRESH_SEC; // 🚀 3. 直接重置倒數秒數，不要在這裡重開 Interval
+    isFetching = false;
+    timer = REFRESH_SEC;
     updateTimerUI();
   }
 }
@@ -570,10 +632,9 @@ function updateTimerUI() {
   document.getElementById('countdown').textContent  = `auto-refresh in ${timer}s`;
 }
 function startCountdown() {
-  if (countdownId) clearInterval(countdownId); // 確保只有一個定時器在跑
+  if (countdownId) clearInterval(countdownId);
   
   countdownId = setInterval(() => {
-    // 🚀 關鍵：如果正在抓取中，秒數凍結不倒數，避免過期重複觸發
     if (isFetching) return; 
 
     timer--;
@@ -588,6 +649,7 @@ function startCountdown() {
 // ── Init ──────────────────────────────────────────────────────
 buildHeader();
 renderChips();
+renderExchangeChips(); // 🚀 新增
 renderTable({});
 fetchRates();
 startCountdown();
