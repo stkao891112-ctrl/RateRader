@@ -5,7 +5,7 @@
   "routes": [
     { "src": "/(.*)", "dest": "main.py" }
   ],
-  "regions": ["hkg1"],
+  "regions": ["hnd1"],
   "env": {
     "PYTHON_VERSION": "3.11"
   }
