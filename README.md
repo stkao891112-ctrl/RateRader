@@ -27,3 +27,4 @@ RateRadar
 
 3. 輕量化 API 接口
 利用 Flask 建構輕量化後端，前端僅需發送一個 HTTP 請求即可獲取所有平台的彙整數據，大幅減少前端的開發複雜度與網路請求次數。
+<img width="1889" height="898" alt="image" src="https://github.com/user-attachments/assets/f6d679b5-b5a9-44e0-ae42-83f06f8a8b3b" />
