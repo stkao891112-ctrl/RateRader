@@ -603,7 +603,7 @@ async function fetchRates() {
   if (isFirstLoad) renderTable({});
 
   try {
-    const url = `/api/proxy?assets=${allCoins.join(',')}`;
+    const url = `/api/funding?assets=${allCoins.join(',')}`;
     const res = await fetch(url);
     const json = await res.json();
     

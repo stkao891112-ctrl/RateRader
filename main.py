@@ -126,4 +126,4 @@ def health():
 
 if __name__ == '__main__':
     # GCP 或一般生產環境建議 debug=False
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    app.run(host='0.0.0.0', port=8000, debug=False)
